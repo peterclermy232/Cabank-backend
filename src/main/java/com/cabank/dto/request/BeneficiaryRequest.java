@@ -12,6 +12,6 @@ public class BeneficiaryRequest {
     @NotBlank
     private String accountNumber;
 
-    @NotBlank
+    // Fix #8: bankName is optional — UI sends it as undefined when blank
     private String bankName;
 }

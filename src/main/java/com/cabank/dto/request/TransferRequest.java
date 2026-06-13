@@ -24,4 +24,8 @@ public class TransferRequest {
     private BigDecimal amount;
 
     private String note;
+
+    // Fix #6: OTP is now required for all transfers
+    @NotBlank(message = "OTP code is required")
+    private String otpCode;
 }

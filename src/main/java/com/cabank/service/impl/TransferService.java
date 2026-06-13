@@ -22,10 +22,16 @@ public class TransferService {
     private final TransferRepository transferRepository;
     private final UserRepository userRepository;
     private final MessageService messageService;
+    // Fix #6: inject OtpService so transfers are OTP-verified
+    private final OtpService otpService;
 
     @Transactional
     public TransferResponse createTransfer(String email, TransferRequest req) {
         User user = getUser(email);
+
+        // Fix #6: verify OTP before processing transfer
+        otpService.verifyTransactionOtp(email, req.getOtpCode());
+
         Transfer transfer = Transfer.builder()
                 .amount(req.getAmount())
                 .fromCardLast4(req.getFromCardLast4())
@@ -37,6 +43,9 @@ public class TransferService {
                 .build();
 
         Transfer saved = transferRepository.save(transfer);
+
+        // Consume OTP so it cannot be reused
+        otpService.consumeTransactionOtp(email);
 
         messageService.createMessage(
                 user,
