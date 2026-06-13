@@ -16,5 +16,7 @@ public class BillPaymentResponse {
     private BigDecimal amount;
     private BigDecimal tax;
     private String status;
+    private String cardLast4;          // which card was charged
+    private BigDecimal newCardBalance; // card balance after payment
     private LocalDateTime createdAt;
 }

@@ -18,4 +18,5 @@ public class TransferResponse {
     private BigDecimal fee;
     private String status;
     private LocalDateTime createdAt;
+    private BigDecimal newCardBalance;
 }

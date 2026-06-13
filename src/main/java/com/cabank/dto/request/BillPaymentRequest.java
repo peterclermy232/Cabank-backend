@@ -24,6 +24,10 @@ public class BillPaymentRequest {
     @NotNull(message = "Amount is required")
     private BigDecimal amount;
 
+    // Which card to debit (the card's UUID from the cards table)
+    @NotBlank(message = "Card ID is required")
+    private String cardId;
+
     @NotBlank(message = "OTP code is required")
     private String otpCode;
 }
