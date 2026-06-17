@@ -34,6 +34,7 @@ com/cabank/dto/request/SavingsRequest.class
 com/cabank/dto/response/CardResponse$CardResponseBuilder.class
 com/cabank/service/impl/TransactionService.class
 com/cabank/controller/TransactionController.class
+com/cabank/entity/InterestRate.class
 com/cabank/entity/Withdrawal$WithdrawalBuilder.class
 com/cabank/entity/User$UserBuilder.class
 com/cabank/dto/response/ExchangeRateResponse$ExchangeRateResponseBuilder.class
@@ -49,6 +50,7 @@ com/cabank/entity/ExchangeRate.class
 com/cabank/dto/request/DepositRequest.class
 com/cabank/dto/response/CardResponse.class
 com/cabank/service/impl/SavingsService.class
+com/cabank/controller/InterestRateController.class
 com/cabank/dto/response/DepositResponse$DepositResponseBuilder.class
 com/cabank/repository/WithdrawalRepository.class
 com/cabank/dto/response/TopUpResponse.class
@@ -61,6 +63,7 @@ com/cabank/entity/User.class
 com/cabank/controller/ExchangeRateController.class
 com/cabank/dto/request/ResetPasswordRequest.class
 com/cabank/dto/response/SavingsResponse$SavingsResponseBuilder.class
+com/cabank/dto/response/InterestRateResponse$InterestRateResponseBuilder.class
 com/cabank/repository/ExchangeRateRepository.class
 com/cabank/entity/Withdrawal$WithdrawalStatus.class
 com/cabank/entity/Savings$SavingsStatus.class
@@ -77,6 +80,7 @@ com/cabank/dto/request/TopUpRequest.class
 com/cabank/entity/BillPayment$BillPaymentBuilder.class
 com/cabank/entity/Account$AccountBuilder.class
 com/cabank/entity/Message$MessageType.class
+com/cabank/entity/InterestRate$InterestRateBuilder.class
 com/cabank/entity/BaseEntity.class
 com/cabank/dto/request/VerifyOtpRequest.class
 com/cabank/dto/response/SavingsResponse.class
@@ -91,6 +95,7 @@ com/cabank/security/UserDetailsServiceImpl.class
 com/cabank/dto/request/UpdateProfileRequest.class
 com/cabank/dto/response/WithdrawResponse$WithdrawResponseBuilder.class
 com/cabank/service/impl/BeneficiaryService.class
+com/cabank/service/impl/InterestRateService.class
 com/cabank/repository/CardRepository.class
 com/cabank/dto/request/AddCardRequest.class
 com/cabank/dto/response/MessageResponse$MessageResponseBuilder.class
@@ -115,6 +120,7 @@ com/cabank/repository/TransactionRepository.class
 com/cabank/entity/Transfer$TransferStatus.class
 com/cabank/dto/response/UserResponse.class
 com/cabank/service/impl/CardService.class
+com/cabank/dto/response/InterestRateResponse.class
 com/cabank/dto/response/UserResponse$UserResponseBuilder.class
 com/cabank/dto/response/BillPaymentResponse$BillPaymentResponseBuilder.class
 com/cabank/repository/OtpRepository.class
@@ -126,6 +132,7 @@ com/cabank/service/impl/ExchangeRateService.class
 com/cabank/dto/response/MessageResponse.class
 com/cabank/entity/User$Role.class
 com/cabank/security/JwtAuthFilter.class
+com/cabank/repository/InterestRateRepository.class
 com/cabank/entity/ExchangeRate$ExchangeRateBuilder.class
 com/cabank/dto/request/SignUpRequest.class
 com/cabank/entity/Card$CardColor.class
