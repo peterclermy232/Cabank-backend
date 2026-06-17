@@ -43,7 +43,10 @@ public class SecurityConfig {
                 .requestMatchers(
                     "/api/auth/**",
                     "/api/exchange-rates",
-                    "/actuator/health"
+                    "/api/interest-rates",
+                    "/actuator/health",
+                    "/ws",
+                    "/ws/**"
                 ).permitAll()
                 .anyRequest().authenticated()
             )

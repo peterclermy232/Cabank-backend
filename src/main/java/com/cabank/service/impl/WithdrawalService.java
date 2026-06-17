@@ -4,19 +4,24 @@ import com.cabank.dto.request.WithdrawRequest;
 import com.cabank.dto.response.WithdrawResponse;
 import com.cabank.entity.Card;
 import com.cabank.entity.Message;
+import com.cabank.entity.Transaction;
 import com.cabank.entity.User;
 import com.cabank.entity.Withdrawal;
 import com.cabank.exception.BadRequestException;
 import com.cabank.exception.ResourceNotFoundException;
 import com.cabank.repository.CardRepository;
+import com.cabank.repository.TransactionRepository;
 import com.cabank.repository.UserRepository;
 import com.cabank.repository.WithdrawalRepository;
+import com.cabank.websocket.WebSocketEventPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,14 +31,15 @@ public class WithdrawalService {
     private final WithdrawalRepository withdrawalRepository;
     private final CardRepository cardRepository;
     private final UserRepository userRepository;
+    private final TransactionRepository transactionRepository;
     private final MessageService messageService;
     private final OtpService otpService;
+    private final WebSocketEventPublisher eventPublisher;
 
     @Transactional
     public WithdrawResponse withdraw(String email, WithdrawRequest req) {
         User user = getUser(email);
 
-        // Verify OTP before touching balance
         otpService.verifyTransactionOtp(email, req.getOtpCode());
 
         Card card = cardRepository.findById(req.getCardId())
@@ -48,7 +54,6 @@ public class WithdrawalService {
             throw new BadRequestException("Withdrawal amount exceeds available balance");
         }
 
-        // Deduct balance
         card.setBalance(card.getBalance().subtract(amount));
         cardRepository.save(card);
 
@@ -62,17 +67,31 @@ public class WithdrawalService {
 
         Withdrawal saved = withdrawalRepository.save(withdrawal);
 
-        // Consume OTP so it cannot be reused
         otpService.consumeTransactionOtp(email);
 
-        messageService.createMessage(
-                user,
-                "CaBank",
-                "You withdrew " + saved.getAmount() + " to " + saved.getPhone()
-                        + " from card ending in " + saved.getCardLast4() + ". Status: " + saved.getStatus().name() + ".",
-                "Withdrawal of " + saved.getAmount(),
-                Message.MessageType.ALERT
-        );
+        // Create Transaction record so withdrawal appears in history
+        Transaction tx = transactionRepository.save(Transaction.builder()
+                .title("Withdrawal to " + saved.getPhone())
+                .category("withdrawal")
+                .amount(saved.getAmount())
+                .type(Transaction.TransactionType.DEBIT)
+                .status(Transaction.TransactionStatus.COMPLETED)
+                .emoji("💵")
+                .description("Withdrawn from card *" + saved.getCardLast4())
+                .user(user)
+                .build());
+
+        String notificationText = "You withdrew " + saved.getAmount() + " to " + saved.getPhone()
+                + " from card ending in " + saved.getCardLast4()
+                + ". New card balance: " + card.getBalance() + ".";
+
+        messageService.createMessage(user, "CaBank", notificationText,
+                "Withdrawal of " + saved.getAmount(), Message.MessageType.ALERT);
+
+        // Push real-time updates
+        eventPublisher.cardBalanceUpdated(email, card.getId(), card.getLast4(), card.getBalance());
+        eventPublisher.newTransaction(email, buildTxPayload(tx));
+        eventPublisher.newMessage(email, "Withdrawal of " + saved.getAmount(), notificationText, "ALERT");
 
         return toResponse(saved, card.getBalance());
     }
@@ -93,6 +112,18 @@ public class WithdrawalService {
                 .newBalance(newBalance)
                 .createdAt(w.getCreatedAt())
                 .build();
+    }
+
+    private Map<String, Object> buildTxPayload(Transaction tx) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", tx.getId());
+        map.put("title", tx.getTitle());
+        map.put("amount", tx.getAmount());
+        map.put("type", tx.getType().name());
+        map.put("category", tx.getCategory());
+        map.put("emoji", tx.getEmoji());
+        map.put("status", tx.getStatus().name());
+        return map;
     }
 
     private User getUser(String email) {

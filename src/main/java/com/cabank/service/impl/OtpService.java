@@ -8,11 +8,17 @@ import com.cabank.exception.ResourceNotFoundException;
 import com.cabank.repository.OtpRepository;
 import com.cabank.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OtpService {
@@ -20,13 +26,21 @@ public class OtpService {
     private final OtpRepository otpRepository;
     private final UserRepository userRepository;
     private final MessageService messageService;
+    private final JavaMailSender mailSender;
+
+    @Value("${app.mail.enabled:false}")
+    private boolean mailEnabled;
+
+    @Value("${app.mail.from:noreply@cabank.app}")
+    private String mailFrom;
 
     private static final int OTP_EXPIRY_MINUTES = 10;
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     /**
-     * Generates an OTP for an authenticated action (e.g. paying a bill, making a transfer),
-     * delivers it via the in-app Messages system, and returns the code so the
-     * frontend can auto-fill it (demo/dev convenience).
+     * Generates a secure OTP, persists it, delivers it via email (if configured)
+     * AND via the in-app Messages feed (so users always see it in the app).
+     * Returns the code only for logging — never expose it in API responses.
      */
     @Transactional
     public String requestTransactionOtp(String email) {
@@ -45,11 +59,18 @@ public class OtpService {
 
         otpRepository.save(otp);
 
+        // Deliver via email if configured
+        if (mailEnabled) {
+            sendOtpEmail(email, user.getName(), code);
+        }
+
+        // Always deliver via in-app message (so the OTP shows in Messages screen)
         messageService.createMessage(
                 user,
                 "CaBank",
                 "Your verification code is " + code
-                        + ". It expires in " + OTP_EXPIRY_MINUTES + " minutes. Do not share this code with anyone.",
+                        + ". It expires in " + OTP_EXPIRY_MINUTES + " minutes. "
+                        + "Do not share this code with anyone.",
                 "Your CaBank verification code",
                 Message.MessageType.OTP
         );
@@ -64,7 +85,8 @@ public class OtpService {
         Otp otp = otpRepository
                 .findTopByUserIdAndPurposeAndUsedFalseOrderByCreatedAtDesc(
                         user.getId(), Otp.OtpPurpose.TRANSACTION)
-                .orElseThrow(() -> new BadRequestException("No verification code found, please request a new one"));
+                .orElseThrow(() -> new BadRequestException(
+                        "No verification code found, please request a new one"));
 
         if (otp.getExpiresAt().isBefore(LocalDateTime.now())) {
             throw new BadRequestException("Verification code has expired, please request a new one");
@@ -92,8 +114,31 @@ public class OtpService {
                 });
     }
 
+    private void sendOtpEmail(String toEmail, String name, String code) {
+        try {
+            SimpleMailMessage msg = new SimpleMailMessage();
+            msg.setFrom(mailFrom);
+            msg.setTo(toEmail);
+            msg.setSubject("CaBank — Your verification code");
+            msg.setText(
+                "Hi " + name + ",\n\n" +
+                "Your CaBank verification code is:\n\n" +
+                "  " + code + "\n\n" +
+                "This code expires in " + OTP_EXPIRY_MINUTES + " minutes.\n" +
+                "Do not share this code with anyone — CaBank will never ask for it.\n\n" +
+                "If you did not request this, please contact support immediately.\n\n" +
+                "— The CaBank Team"
+            );
+            mailSender.send(msg);
+        } catch (Exception e) {
+            log.error("Failed to send OTP email to {}: {}", toEmail, e.getMessage());
+            // Don't rethrow — in-app message is the fallback delivery channel
+        }
+    }
+
+    /** Cryptographically secure 6-digit OTP */
     private String generateOtpCode() {
-        return String.format("%05d", (int) (Math.random() * 100000));
+        return String.format("%06d", RANDOM.nextInt(1_000_000));
     }
 
     private User getUser(String email) {

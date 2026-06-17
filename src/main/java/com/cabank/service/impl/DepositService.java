@@ -10,6 +10,7 @@ import com.cabank.exception.ResourceNotFoundException;
 import com.cabank.repository.AccountRepository;
 import com.cabank.repository.TransactionRepository;
 import com.cabank.repository.UserRepository;
+import com.cabank.websocket.WebSocketEventPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +26,7 @@ public class DepositService {
     private final UserRepository userRepository;
     private final MessageService messageService;
     private final OtpService otpService;
+    private final WebSocketEventPublisher eventPublisher;
 
     @Transactional
     public DepositResponse deposit(String email, DepositRequest req) {
@@ -59,16 +61,15 @@ public class DepositService {
 
         Transaction saved = transactionRepository.save(tx);
 
-        // Notification message
-        messageService.createMessage(
-                user,
-                "CaBank",
-                "Your deposit of " + req.getAmount() + " to account "
-                        + req.getAccountNumber() + " was successful. "
-                        + "New balance: " + account.getBalance() + ".",
-                "Deposit of " + req.getAmount() + " received",
-                Message.MessageType.NOTIFICATION
-        );
+        String notificationText = "Your deposit of " + req.getAmount() + " to account "
+                + req.getAccountNumber() + " was successful. "
+                + "New balance: " + account.getBalance() + ".";
+        messageService.createMessage(user, "CaBank", notificationText,
+                "Deposit of " + req.getAmount() + " received", Message.MessageType.NOTIFICATION);
+
+        // Push real-time balance update
+        eventPublisher.accountBalanceUpdated(email, account.getId(), account.getBalance());
+        eventPublisher.newMessage(email, "Deposit of " + req.getAmount() + " received", notificationText, "NOTIFICATION");
 
         return DepositResponse.builder()
                 .id(saved.getId())

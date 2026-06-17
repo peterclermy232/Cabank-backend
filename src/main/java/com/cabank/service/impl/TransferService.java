@@ -15,6 +15,7 @@ import com.cabank.repository.CardRepository;
 import com.cabank.repository.TransactionRepository;
 import com.cabank.repository.TransferRepository;
 import com.cabank.repository.UserRepository;
+import com.cabank.websocket.WebSocketEventPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +35,7 @@ public class TransferService {
     private final TransactionRepository transactionRepository;
     private final MessageService messageService;
     private final OtpService otpService;
+    private final WebSocketEventPublisher eventPublisher;
 
     @Transactional
     public TransferResponse createTransfer(String email, TransferRequest req) {
@@ -126,15 +128,15 @@ public class TransferService {
                 .build());
 
         // 9. Notify the sender
-        messageService.createMessage(
-                sender,
-                "CaBank",
-                "You sent " + saved.getAmount() + " to " + saved.getBeneficiaryName() +
-                        " (" + saved.getToAccountNumber() + "). Fee: " + fee +
-                        ". New card balance: " + senderCard.getBalance() + ".",
-                "Transfer of " + saved.getAmount() + " sent",
-                Message.MessageType.ALERT
-        );
+        String notificationText = "You sent " + saved.getAmount() + " to " + saved.getBeneficiaryName() +
+                " (" + saved.getToAccountNumber() + "). Fee: " + fee +
+                ". New card balance: " + senderCard.getBalance() + ".";
+        messageService.createMessage(sender, "CaBank", notificationText,
+                "Transfer of " + saved.getAmount() + " sent", Message.MessageType.ALERT);
+
+        // 10. Push real-time balance + transaction updates to the sender
+        eventPublisher.cardBalanceUpdated(email, senderCard.getId(), senderCard.getLast4(), senderCard.getBalance());
+        eventPublisher.newMessage(email, "Transfer of " + saved.getAmount() + " sent", notificationText, "ALERT");
 
         return toResponse(saved, senderCard.getBalance());
     }

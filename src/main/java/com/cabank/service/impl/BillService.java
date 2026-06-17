@@ -13,6 +13,7 @@ import com.cabank.repository.BillPaymentRepository;
 import com.cabank.repository.CardRepository;
 import com.cabank.repository.TransactionRepository;
 import com.cabank.repository.UserRepository;
+import com.cabank.websocket.WebSocketEventPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +32,7 @@ public class BillService {
     private final UserRepository userRepository;
     private final MessageService messageService;
     private final OtpService otpService;
+    private final WebSocketEventPublisher eventPublisher;
 
     // Tax rate: 10% of the bill amount
     private static final BigDecimal TAX_RATE = new BigDecimal("0.10");
@@ -96,17 +98,16 @@ public class BillService {
                 .user(user)
                 .build());
 
-        // 9. Send notification
-        messageService.createMessage(
-                user,
-                "CaBank",
-                "Your " + formatBillTitle(saved.getBillType()) + " bill of $" + saved.getAmount() +
-                        " (+ $" + tax + " tax) for " + saved.getCustomerName() +
-                        " was paid from card ending in " + card.getLast4() +
-                        ". New card balance: $" + card.getBalance() + ".",
-                formatBillTitle(saved.getBillType()) + " bill paid — $" + total,
-                Message.MessageType.NOTIFICATION
-        );
+        // 9. Send notification and push real-time update
+        String billTitle = formatBillTitle(saved.getBillType()) + " bill paid — $" + total;
+        String notificationText = "Your " + formatBillTitle(saved.getBillType()) + " bill of $" + saved.getAmount() +
+                " (+ $" + tax + " tax) for " + saved.getCustomerName() +
+                " was paid from card ending in " + card.getLast4() +
+                ". New card balance: $" + card.getBalance() + ".";
+        messageService.createMessage(user, "CaBank", notificationText, billTitle, Message.MessageType.NOTIFICATION);
+
+        eventPublisher.cardBalanceUpdated(email, card.getId(), card.getLast4(), card.getBalance());
+        eventPublisher.newMessage(email, billTitle, notificationText, "NOTIFICATION");
 
         return toResponse(saved, card.getLast4(), card.getBalance(), tax);
     }
